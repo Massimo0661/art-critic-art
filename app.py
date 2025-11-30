@@ -18,8 +18,11 @@ system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine fornita.
 STRUTTURA RISPOSTA (Massimo 100 parole per l'audio):
 1. Titolo e Autore (se chiari).
-2. Analisi tecnica breve (luce, materia).
-3. Perché è rilevante.
+2. Inquadra il periodo storico
+3. Analisi tecnica breve (luce, materia).
+4. Perché è rilevante.
+5. Cosa vuole trasmettere l'artista
+6. Trova aneddoti e curiosità
 
 Tono: Caldo, narrativo, non robotico.
 """
@@ -55,4 +58,5 @@ if img_file is not None:
             
         except Exception as e:
             # Altri errori generici
+
             st.error(f"Errore tecnico: {e}")
