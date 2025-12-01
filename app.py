@@ -5,71 +5,66 @@ from gtts import gTTS
 import os
 
 # --- CONFIGURAZIONE ---
-# Assicurati che la chiave sia tra le virgolette
+# La chiave viene presa dai Secrets di Streamlit
 GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 
 genai.configure(api_key=GOOGLE_API_KEY)
-
-# Usiamo il modello che abbiamo verificato funzionare
 model = genai.GenerativeModel('gemini-2.0-flash')
 
-# --- PROMPT OTTIMIZZATO ---
+# --- PROMPT ---
 system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine fornita.
 STRUTTURA RISPOSTA (Massimo 100 parole per l'audio):
 1. Titolo e Autore (se chiari).
-2. Inquadra il periodo storico
-3. Analisi tecnica breve (luce, materia).
-4. Perché è rilevante.
-5. Cosa vuole trasmettere l'artista
-6. Trova aneddoti e curiosità
+2. Analisi tecnica breve (luce, materia).
+4. Stile pittorico
+5. Perché è rilevante.
+6. Aneddoti e curiosità
 
 Tono: Caldo, narrativo, non robotico.
 """
 
-st.title("🏛️ Art Critic AI (Audio)")
+# --- INTERFACCIA ---
+st.title("🏛️ Art Critic AI")
 
-# --- SCELTA METODO DI INPUT ---
-opzione = st.radio("Scegli come inserire l'immagine:", ["Carica/Scatta (Alta Qualità)", "Webcam (Rapida)"])
+# MENU DI SCELTA (Radio Button)
+opzione = st.radio("Scegli modalità:", ["Carica/Scatta (Alta Qualità)", "Webcam (Rapida)"])
 
 img_file = None
 
+# LOGICA DI SCELTA
 if opzione == "Webcam (Rapida)":
+    # Opzione 1: Webcam del browser
     img_file = st.camera_input("Scatta ora")
 else:
-    img_file = st.file_uploader("Scegli dalla galleria o Scatta", type=['jpg', 'jpeg', 'png'])
+    # Opzione 2: Fotocamera nativa o Galleria
+    img_file = st.file_uploader("Carica o Scatta", type=['jpg', 'jpeg', 'png'])
 
-# --- IL RESTO DEL CODICE RIMANE UGUALE ---
-if img_file is not None:
-    # ... tutto il resto del codice che avevi già ...
-
+# --- ELABORAZIONE (Questa riga deve essere attaccata al margine sinistro!) ---
 if img_file is not None:
     image = Image.open(img_file)
     
-    with st.spinner('Analisi in corso...'):
+    # Mostra l'immagine se caricata da file (la webcam la mostra già da sola)
+    if opzione != "Webcam (Rapida)":
+        st.image(image, caption="Opera caricata", use_container_width=True)
+    
+    with st.spinner('Il critico sta osservando...'):
         try:
             # 1. Chiediamo a Gemini
             response = model.generate_content([system_prompt, image])
-            
-            # 2. Assegniamo il testo a una variabile
             testo_critico = response.text
             
-            # 3. Mostriamo il testo a schermo
+            # 2. Mostriamo il testo
             st.markdown("### 🧐 L'Esperto dice:")
             st.write(testo_critico)
             
-            # 4. Generiamo l'audio SOLO se abbiamo il testo
+            # 3. Generiamo l'audio
             if testo_critico:
                 tts = gTTS(text=testo_critico, lang='it')
                 tts.save("spiegazione.mp3")
                 st.audio("spiegazione.mp3")
             
         except ValueError:
-            # Questo errore scatta se Gemini blocca l'immagine (es. nudo artistico)
-            st.error("⚠️ L'IA ha bloccato la risposta per motivi di sicurezza (filtro contenuti). Prova con un'altra opera.")
-            
+            st.error("⚠️ Immagine bloccata dai filtri di sicurezza.")
         except Exception as e:
-            # Altri errori generici
-
             st.error(f"Errore tecnico: {e}")
-
