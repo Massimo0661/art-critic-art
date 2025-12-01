@@ -2,76 +2,90 @@ import streamlit as st
 import google.generativeai as genai
 from PIL import Image
 from gtts import gTTS
-import os
-
-# --- NUOVO: Gestione Formato HEIC (iPhone/Android) ---
 from pillow_heif import register_heif_opener
-register_heif_opener() # <-- Questo comando insegna a Pillow a leggere gli HEIC
+import io
+import time
+
+# 1. ABILITIAMO I FORMATI IPHONE (HEIC)
+register_heif_opener()
 
 # --- CONFIGURAZIONE ---
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
 except:
-    st.error("Manca la API Key nei Secrets!")
+    st.error("Manca la API Key!")
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash')
+
+# USIAMO IL MODELLO 1.5 FLASH (Più stabile del 2.0 per i limiti gratuiti)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 system_prompt = """
-Sei un esperto Storico dell'Arte. Analizza l'immagine fornita.
-Usa max 150 parole.
-1. Cosa è (Autore/Titolo/anno).
-2. Dettaglio tecnico su stile pittorico.
-3. Tecnica e materica: Colore, luci e pennellata
-4. Significato.
-5. Aneddoti e curiosità
+Sei un esperto Storico dell'Arte. Analizza l'immagine.
+Sii sintetico (max 80 parole).
+1. Autore/Titolo (se noti).
+2. Tecnica/Stile.
+3. Significato breve.
 """
 
-st.title("🏛️ Art Critic by Marta")
+st.title("🏛️ Art Critic AI by Marta")
 
 # --- MENU ---
-opzione = st.radio("Modalità:", ["Carica/Scatta", "Webcam"])
+opzione = st.radio("Modalità:", ["Carica Foto", "Webcam"])
 img_file = None
 
 if opzione == "Webcam":
     img_file = st.camera_input("Scatta ora")
 else:
-    img_file = st.file_uploader("Premi qui per Foto", accept_multiple_files=False)
+    # Blocchiamo i video, accettiamo solo immagini
+    img_file = st.file_uploader(
+        "Scegli dalla Galleria", 
+        type=['png', 'jpg', 'jpeg', 'heic', 'webp'], 
+        accept_multiple_files=False
+    )
 
-# --- DEBUG & ELABORAZIONE ---
+# --- ELABORAZIONE ---
 if img_file is not None:
-    st.success("File ricevuto! Elaborazione in corso...")
+    st.success("Immagine ricevuta. Analisi...")
     
     try:
-        # ORA QUESTO FUNZIONERÀ ANCHE CON HEIC GRAZIE ALLA MODIFICA IN ALTO
+        # Apriamo l'immagine
         image = Image.open(img_file)
         
-        # Ridimensiona
-        image.thumbnail((1024, 1024)) 
+        # Conversione forzata in RGB
+        image = image.convert('RGB')
         
-        st.image(image, caption="Immagine pronta", use_container_width=True)
+        # Ridimensioniamo
+        image.thumbnail((1024, 1024))
         
-        # Bottone Analisi
-        if st.button("✨ Analizza Ora"):
-            with st.spinner('La Critica sta pensando...'):
-                response = model.generate_content([system_prompt, image])
-                testo = response.text
-                st.markdown("### 🎙️ Risultato:")
-                st.write(testo)
-                if testo:
-                    tts = gTTS(text=testo, lang='it')
-                    tts.save("audio.mp3")
-                    st.audio("audio.mp3")
+        st.image(image, caption="Opera acquisita", use_container_width=True)
+        
+        # Bottone manuale
+        if st.button("✨ Analizza Opera"):
+            with st.spinner('La critica sta osservando...'):
+                
+                try:
+                    # Chiamata a Gemini
+                    response = model.generate_content([system_prompt, image])
+                    testo = response.text
                     
-   except Exception as e:
-        errore_str = str(e)
-        if "429" in errore_str or "Resource has been exhausted" in errore_str:
-            st.warning("⏳ La Critica d'Arte è stanca (Troppe richieste). Aspetta qualche minuto e riprova!")
-        else:
-            st.error(f"Errore tecnico: {e}")
-else:
-    if opzione != "Webcam":
-        st.info("👆 Carica una foto per iniziare")
+                    st.markdown("### 🎙️ Risultato:")
+                    st.write(testo)
+                    
+                    # Audio
+                    if testo:
+                        tts = gTTS(text=testo, lang='it')
+                        tts.save("audio.mp3")
+                        st.audio("audio.mp3")
 
-
+                except Exception as e:
+                    # GESTIONE ERRORI AVANZATA (Indentata correttamente)
+                    errore_str = str(e)
+                    if "429" in errore_str or "Resource has been exhausted" in errore_str:
+                        st.warning("⏳ La Critica è stanca (Troppe richieste). Aspetta 1 minuto e riprova.")
+                    else:
+                        st.error(f"Errore tecnico: {e}")
+                    
+    except Exception as e:
+        st.error(f"Errore caricamento file: {e}")
