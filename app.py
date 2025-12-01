@@ -29,7 +29,19 @@ Tono: Caldo, narrativo, non robotico.
 
 st.title("🏛️ Art Critic AI (Audio)")
 
-img_file = st.camera_input("Scatta una foto")
+# --- SCELTA METODO DI INPUT ---
+opzione = st.radio("Scegli come inserire l'immagine:", ["Carica/Scatta (Alta Qualità)", "Webcam (Rapida)"])
+
+img_file = None
+
+if opzione == "Webcam (Rapida)":
+    img_file = st.camera_input("Scatta ora")
+else:
+    img_file = st.file_uploader("Scegli dalla galleria o Scatta", type=['jpg', 'jpeg', 'png'])
+
+# --- IL RESTO DEL CODICE RIMANE UGUALE ---
+if img_file is not None:
+    # ... tutto il resto del codice che avevi già ...
 
 if img_file is not None:
     image = Image.open(img_file)
@@ -60,3 +72,4 @@ if img_file is not None:
             # Altri errori generici
 
             st.error(f"Errore tecnico: {e}")
+
