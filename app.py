@@ -54,7 +54,7 @@ if img_file is not None:
         
         # Bottone Analisi
         if st.button("✨ Analizza Ora"):
-            with st.spinner('Il critico sta pensando...'):
+            with st.spinner('La Critica sta pensando...'):
                 response = model.generate_content([system_prompt, image])
                 testo = response.text
                 st.markdown("### 🎙️ Risultato:")
@@ -64,10 +64,14 @@ if img_file is not None:
                     tts.save("audio.mp3")
                     st.audio("audio.mp3")
                     
-    except Exception as e:
-        # Se fallisce ancora, l'errore ci dirà esattamente perché
-        st.error(f"Errore critico nella lettura: {e}")
+   except Exception as e:
+        errore_str = str(e)
+        if "429" in errore_str or "Resource has been exhausted" in errore_str:
+            st.warning("⏳ La Critica d'Arte è stanca (Troppe richieste). Aspetta qualche minuto e riprova!")
+        else:
+            st.error(f"Errore tecnico: {e}")
 else:
     if opzione != "Webcam":
         st.info("👆 Carica una foto per iniziare")
+
 
