@@ -5,7 +5,7 @@ from gtts import gTTS
 from pillow_heif import register_heif_opener
 import io
 
-# 1. FIX FORMATI CELLULARE
+# 1. FIX FORMATI
 register_heif_opener()
 
 # --- CONFIGURAZIONE ---
@@ -29,27 +29,32 @@ Sii sintetico (max 80 parole).
 
 st.title("🏛️ Art Critic AI by MartaG")
 
-# --- GESTIONE DELLA MEMORIA (SESSION STATE) ---
-# Se non esiste una memoria per l'analisi, la creiamo
+# --- GESTIONE MEMORIA & RESET ---
+# Creiamo una "chiave" univoca per il caricatore di file
+if 'uploader_key' not in st.session_state:
+    st.session_state['uploader_key'] = 0
+
 if 'analisi_fatta' not in st.session_state:
     st.session_state['analisi_fatta'] = None
 if 'audio_fatto' not in st.session_state:
     st.session_state['audio_fatto'] = None
 
 # --- MENU ---
-st.info("💡 Consiglio su Mobile: Usa 'Carica Foto' -> 'Scatta' per salvare la foto in galleria.")
-opzione = st.radio("Modalità:", ["Carica Foto (Consigliata)", "Webcam"])
+opzione = st.radio("Modalità:", ["Carica Foto", "Webcam"])
 img_file = None
 
 if opzione == "Webcam":
     img_file = st.camera_input("Scatta ora")
 else:
-    # Accetta tutto
-    img_file = st.file_uploader("Premi qui", type=['png', 'jpg', 'jpeg', 'heic', 'webp'])
+    # NOTA: key=... serve per poter resettare questo campo col bottone in fondo
+    img_file = st.file_uploader(
+        "Premi qui", 
+        type=['png', 'jpg', 'jpeg', 'heic', 'webp'], 
+        key=f"uploader_{st.session_state['uploader_key']}"
+    )
 
-# --- LOGICA BLINDATA ---
+# --- ELABORAZIONE ---
 if img_file is not None:
-    # Appena arriva un file, proviamo a elaborarlo
     try:
         image = Image.open(img_file)
         image = image.convert('RGB')
@@ -57,18 +62,21 @@ if img_file is not None:
         
         st.image(image, caption="Opera pronta", use_container_width=True)
         
-        # Bottone per analizzare
         if st.button("✨ Analizza Opera"):
             with st.spinner('Analisi in corso...'):
                 try:
                     # Chiamata AI
                     response = model.generate_content([system_prompt, image])
-                    st.session_state['analisi_fatta'] = response.text
+                    testo_originale = response.text
                     
-                    # Generazione Audio
-                    if response.text:
-                        tts = gTTS(text=response.text, lang='it')
-                        # Salviamo in un buffer di memoria invece che su file (più stabile su mobile)
+                    # Salviamo il risultato scritto (con grassetti belli da vedere)
+                    st.session_state['analisi_fatta'] = testo_originale
+                    
+                    # PULIZIA PER AUDIO: Rimuoviamo * e # per la voce
+                    testo_pulito = testo_originale.replace("*", "").replace("#", "")
+                    
+                    if testo_pulito:
+                        tts = gTTS(text=testo_pulito, lang='it')
                         mp3_fp = io.BytesIO()
                         tts.write_to_fp(mp3_fp)
                         st.session_state['audio_fatto'] = mp3_fp
@@ -77,10 +85,9 @@ if img_file is not None:
                     st.error(f"Errore Gemini: {e}")
 
     except Exception as e:
-        st.error(f"Errore lettura file: {e}")
+        st.error(f"Errore file: {e}")
 
-# --- MOSTRA I RISULTATI DALLA MEMORIA ---
-# Questo blocco è fuori dagli IF, così se la pagina si ricarica, i risultati restano!
+# --- RISULTATI ---
 if st.session_state['analisi_fatta']:
     st.markdown("### 🎙️ Risultato:")
     st.write(st.session_state['analisi_fatta'])
@@ -88,8 +95,14 @@ if st.session_state['analisi_fatta']:
     if st.session_state['audio_fatto']:
         st.audio(st.session_state['audio_fatto'], format='audio/mp3')
         
-    # Tasto per ricominciare
-    if st.button("🔄 Nuova Analisi"):
+    st.divider() # Una linea divisoria elegante
+    
+    # TASTO RESET VERO
+    if st.button("🔄 Nuova Analisi (Resetta Tutto)"):
+        # 1. Cancelliamo i risultati
         st.session_state['analisi_fatta'] = None
         st.session_state['audio_fatto'] = None
+        # 2. Incrementiamo la chiave per forzare lo svuotamento del caricatore foto
+        st.session_state['uploader_key'] += 1
+        # 3. Ricarichiamo la pagina
         st.rerun()
