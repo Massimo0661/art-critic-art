@@ -20,13 +20,15 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 
 system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine fornita.
-Sii sintetico (max 80 parole).
-1. Cosa è (Autore/Titolo).
-2. Dettaglio tecnico.
-3. Significato.
+Usa max 150 parole.
+1. Cosa è (Autore/Titolo/anno).
+2. Dettaglio tecnico su stile pittorico.
+3. Tecnica e materica: Colore, luci e pennellata
+4. Significato.
+5. Aneddoti e curiosità
 """
 
-st.title("🏛️ Art Critic AI (HEIC Fix)")
+st.title("🏛️ Art Critic by Marta")
 
 # --- MENU ---
 opzione = st.radio("Modalità:", ["Carica/Scatta", "Webcam"])
@@ -68,3 +70,4 @@ if img_file is not None:
 else:
     if opzione != "Webcam":
         st.info("👆 Carica una foto per iniziare")
+
