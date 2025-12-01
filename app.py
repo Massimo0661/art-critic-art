@@ -8,7 +8,7 @@ import gc
 
 # 1. SETUP: TOLTO "layout=wide" PER COMPATIBILITÀ ANDROID
 register_heif_opener()
-st.set_page_config(page_title="Art AI", page_icon="📷") # Default layout (Centered)
+st.set_page_config(page_title="Art AI by MartaG", page_icon="📷") # Default layout (Centered)
 
 # --- CONFIGURAZIONE ---
 try:
@@ -23,9 +23,12 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 
 system_prompt = """
 Sei una guida museale. Analizza l'opera.
-Risposta breve per audio (max 50 parole).
-1. Titolo/Autore.
+Risposta breve per audio (max 150 parole).
+1. Titolo/Autore/Anno.
 2. Dettaglio tecnico.
+3. Analisi materica
+4. Analisi tecnica pittorica: pennellata, luci e colori
+5. Aneddoti e curiosità
 Tono: Coinvolgente.
 """
 
@@ -96,3 +99,4 @@ if file_input:
 if st.session_state['audio_fatto']:
     st.success("Ascolta la guida:")
     st.audio(st.session_state['audio_fatto'], format='audio/mp3', autoplay=True)
+
