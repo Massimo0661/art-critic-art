@@ -32,7 +32,7 @@ Risposta breve per audio (max 150 parole).
 Tono: Coinvolgente.
 """
 
-st.title("📷 Art Critic")
+st.title("📷 Art Critic by MartaG")
 
 # --- MEMORIA ---
 if 'audio_fatto' not in st.session_state:
@@ -99,4 +99,5 @@ if file_input:
 if st.session_state['audio_fatto']:
     st.success("Ascolta la guida:")
     st.audio(st.session_state['audio_fatto'], format='audio/mp3', autoplay=True)
+
 
