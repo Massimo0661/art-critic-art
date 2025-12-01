@@ -24,9 +24,10 @@ model = genai.GenerativeModel('gemini-2.0-flash')
 system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine.
 Sii sintetico (max 80 parole).
-1. Autore/Titolo (se noti).
-2. Tecnica/Stile.
+1. Autore/Titolo/anno (se noti).
+2. Tecnica/Stile/Luce/Colori.
 3. Significato breve.
+4. Aneddoti e curiosità (se noti).
 """
 
 st.title("🏛️ Art Critic AI by MartaG")
@@ -90,3 +91,4 @@ if img_file is not None:
                     
     except Exception as e:
         st.error(f"Errore caricamento file (forse è un video?): {e}")
+
