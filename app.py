@@ -18,8 +18,8 @@ except:
 
 genai.configure(api_key=GOOGLE_API_KEY)
 
-# USIAMO IL MODELLO 1.5 FLASH (Più stabile del 2.0 per i limiti gratuiti)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- MOTORE: TORNIAMO AL 2.0 CHE FUNZIONAVA ---
+model = genai.GenerativeModel('gemini-2.0-flash')
 
 system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine.
@@ -29,7 +29,7 @@ Sii sintetico (max 80 parole).
 3. Significato breve.
 """
 
-st.title("🏛️ Art Critic AI by Marta")
+st.title("🏛️ Art Critic AI by MartaG")
 
 # --- MENU ---
 opzione = st.radio("Modalità:", ["Carica Foto", "Webcam"])
@@ -56,7 +56,7 @@ if img_file is not None:
         # Conversione forzata in RGB
         image = image.convert('RGB')
         
-        # Ridimensioniamo
+        # Ridimensioniamo (Importante per velocità e memoria)
         image.thumbnail((1024, 1024))
         
         st.image(image, caption="Opera acquisita", use_container_width=True)
@@ -80,12 +80,13 @@ if img_file is not None:
                         st.audio("audio.mp3")
 
                 except Exception as e:
-                    # GESTIONE ERRORI AVANZATA (Indentata correttamente)
+                    # GESTIONE ERRORI
                     errore_str = str(e)
-                    if "429" in errore_str or "Resource has been exhausted" in errore_str:
-                        st.warning("⏳ La Critica è stanca (Troppe richieste). Aspetta 1 minuto e riprova.")
+                    # Se Gemini 2.0 è stanco, lo diciamo in modo gentile
+                    if "429" in errore_str or "Resource" in errore_str:
+                        st.warning("⏳ Troppe richieste veloci! Il modello gratuito ha bisogno di una pausa. Aspetta 1 minuto.")
                     else:
-                        st.error(f"Errore tecnico: {e}")
+                        st.error(f"Errore nell'analisi: {e}")
                     
     except Exception as e:
-        st.error(f"Errore caricamento file: {e}")
+        st.error(f"Errore caricamento file (forse è un video?): {e}")
