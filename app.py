@@ -4,9 +4,8 @@ from PIL import Image
 from gtts import gTTS
 from pillow_heif import register_heif_opener
 import io
-import time
 
-# 1. ABILITIAMO I FORMATI IPHONE (HEIC)
+# 1. FIX FORMATI CELLULARE
 register_heif_opener()
 
 # --- CONFIGURAZIONE ---
@@ -17,78 +16,80 @@ except:
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
-
-# --- MOTORE: TORNIAMO AL 2.0 CHE FUNZIONAVA ---
 model = genai.GenerativeModel('gemini-2.0-flash')
 
 system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine.
 Sii sintetico (max 80 parole).
-1. Autore/Titolo/anno (se noti).
-2. Tecnica/Stile/Luce/Colori.
+1. Autore/Titolo/Anno (se noti).
+2. Tecnica/Stile/Luce/Colore.
 3. Significato breve.
-4. Aneddoti e curiosità (se noti).
+4. Aneddoti e curiosità.
 """
 
 st.title("🏛️ Art Critic AI by MartaG")
 
+# --- GESTIONE DELLA MEMORIA (SESSION STATE) ---
+# Se non esiste una memoria per l'analisi, la creiamo
+if 'analisi_fatta' not in st.session_state:
+    st.session_state['analisi_fatta'] = None
+if 'audio_fatto' not in st.session_state:
+    st.session_state['audio_fatto'] = None
+
 # --- MENU ---
-opzione = st.radio("Modalità:", ["Carica Foto", "Webcam"])
+st.info("💡 Consiglio su Mobile: Usa 'Carica Foto' -> 'Scatta' per salvare la foto in galleria.")
+opzione = st.radio("Modalità:", ["Carica Foto (Consigliata)", "Webcam"])
 img_file = None
 
 if opzione == "Webcam":
     img_file = st.camera_input("Scatta ora")
 else:
-    # Blocchiamo i video, accettiamo solo immagini
-    img_file = st.file_uploader(
-        "Scegli dalla Galleria", 
-        type=['png', 'jpg', 'jpeg', 'heic', 'webp'], 
-        accept_multiple_files=False
-    )
+    # Accetta tutto
+    img_file = st.file_uploader("Premi qui", type=['png', 'jpg', 'jpeg', 'heic', 'webp'])
 
-# --- ELABORAZIONE ---
+# --- LOGICA BLINDATA ---
 if img_file is not None:
-    st.success("Immagine ricevuta. Analisi...")
-    
+    # Appena arriva un file, proviamo a elaborarlo
     try:
-        # Apriamo l'immagine
         image = Image.open(img_file)
-        
-        # Conversione forzata in RGB
         image = image.convert('RGB')
-        
-        # Ridimensioniamo (Importante per velocità e memoria)
         image.thumbnail((1024, 1024))
         
-        st.image(image, caption="Opera acquisita", use_container_width=True)
+        st.image(image, caption="Opera pronta", use_container_width=True)
         
-        # Bottone manuale
+        # Bottone per analizzare
         if st.button("✨ Analizza Opera"):
-            with st.spinner('La critica sta osservando...'):
-                
+            with st.spinner('Analisi in corso...'):
                 try:
-                    # Chiamata a Gemini
+                    # Chiamata AI
                     response = model.generate_content([system_prompt, image])
-                    testo = response.text
+                    st.session_state['analisi_fatta'] = response.text
                     
-                    st.markdown("### 🎙️ Risultato:")
-                    st.write(testo)
-                    
-                    # Audio
-                    if testo:
-                        tts = gTTS(text=testo, lang='it')
-                        tts.save("audio.mp3")
-                        st.audio("audio.mp3")
-
+                    # Generazione Audio
+                    if response.text:
+                        tts = gTTS(text=response.text, lang='it')
+                        # Salviamo in un buffer di memoria invece che su file (più stabile su mobile)
+                        mp3_fp = io.BytesIO()
+                        tts.write_to_fp(mp3_fp)
+                        st.session_state['audio_fatto'] = mp3_fp
+                        
                 except Exception as e:
-                    # GESTIONE ERRORI
-                    errore_str = str(e)
-                    # Se Gemini 2.0 è stanco, lo diciamo in modo gentile
-                    if "429" in errore_str or "Resource" in errore_str:
-                        st.warning("⏳ Troppe richieste veloci! Il modello gratuito ha bisogno di una pausa. Aspetta 1 minuto.")
-                    else:
-                        st.error(f"Errore nell'analisi: {e}")
-                    
-    except Exception as e:
-        st.error(f"Errore caricamento file (forse è un video?): {e}")
+                    st.error(f"Errore Gemini: {e}")
 
+    except Exception as e:
+        st.error(f"Errore lettura file: {e}")
+
+# --- MOSTRA I RISULTATI DALLA MEMORIA ---
+# Questo blocco è fuori dagli IF, così se la pagina si ricarica, i risultati restano!
+if st.session_state['analisi_fatta']:
+    st.markdown("### 🎙️ Risultato:")
+    st.write(st.session_state['analisi_fatta'])
+    
+    if st.session_state['audio_fatto']:
+        st.audio(st.session_state['audio_fatto'], format='audio/mp3')
+        
+    # Tasto per ricominciare
+    if st.button("🔄 Nuova Analisi"):
+        st.session_state['analisi_fatta'] = None
+        st.session_state['audio_fatto'] = None
+        st.rerun()
