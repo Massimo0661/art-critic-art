@@ -1,10 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
-from PIL import Image
+from PIL import Image, ImageOps # <--- NUOVO: ImageOps per la rotazione sicura
 from gtts import gTTS
 from pillow_heif import register_heif_opener
 import io
-import gc # <--- NUOVO: Lo spazzino della memoria RAM
+import gc
 
 # 1. SETUP
 register_heif_opener()
@@ -18,7 +18,8 @@ except:
     st.stop()
 
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-2.0-flash')
+# Usiamo il modello Flash (più leggero e veloce)
+model = genai.GenerativeModel('gemini-1.5-flash')
 
 system_prompt = """
 Sei un esperto Storico dell'Arte. Analizza l'immagine.
@@ -30,12 +31,10 @@ Sii sintetico (max 80 parole).
 
 st.title("🏛️ Art Critic AI")
 
-# --- FUNZIONI DI PULIZIA (LO SPAZZINO) ---
+# --- FUNZIONI DI PULIZIA ---
 def reset_dati():
-    """Questa funzione parte APPENA tocchi il caricatore di file"""
     st.session_state['analisi_fatta'] = None
     st.session_state['audio_fatto'] = None
-    # Forza la pulizia della RAM del telefono
     gc.collect()
 
 # --- MEMORIA ---
@@ -47,7 +46,7 @@ if 'audio_fatto' not in st.session_state:
     st.session_state['audio_fatto'] = None
 
 # --- MENU ---
-st.caption("📸 Modalità Mobile Ottimizzata")
+st.caption("📸 Carica la foto del quadro (attendi il caricamento completo)")
 opzione = st.radio("Scegli:", ["Carica Foto", "Webcam"], horizontal=True, on_change=reset_dati)
 
 img_file = None
@@ -55,8 +54,7 @@ img_file = None
 if opzione == "Webcam":
     img_file = st.camera_input("Scatta", on_change=reset_dati)
 else:
-    # Uploader con AUTO-RESET
-    # on_change=reset_dati significa: "Se cambi file, cancella i vecchi risultati subito"
+    # Uploader
     img_file = st.file_uploader(
         "Scegli immagine", 
         type=['png', 'jpg', 'jpeg', 'heic', 'webp'], 
@@ -64,31 +62,42 @@ else:
         on_change=reset_dati 
     )
 
-# --- ELABORAZIONE ---
+# --- ELABORAZIONE SICURA ---
 if img_file is not None:
-    # Se c'è un file ma NON c'è ancora un'analisi, mostriamo l'anteprima
     if st.session_state['analisi_fatta'] is None:
         
-        with st.status("Caricamento...", expanded=True) as status:
+        # STATUS BAR PER FEEDBACK VISIVO
+        with st.status("Elaborazione immagine pesante...", expanded=True) as status:
             try:
+                # 1. Caricamento "Lazy" (apre solo i metadati prima)
                 image = Image.open(img_file)
+                st.write("📖 Lettura file completata...")
+                
+                # 2. FIX ROTAZIONE (Cruciale per il Monet orizzontale)
+                # Questo evita che la foto venga caricata storta o crashi nel raddrizzarla
+                image = ImageOps.exif_transpose(image)
+                
+                # 3. CONVERSIONE E RIDUZIONE
                 image = image.convert('RGB')
                 
-                # Ridimensionamento aggressivo per non bloccare la seconda foto
+                # Riduciamo drasticamente prima di mostrarla
+                # Max 800px è più che sufficiente per l'AI
                 image.thumbnail((800, 800))
+                st.write("📉 Ottimizzazione completata.")
                 
-                st.image(image, caption="Immagine pronta", use_container_width=True)
-                status.update(label="Pronto!", state="complete", expanded=False)
+                status.update(label="Immagine Pronta!", state="complete", expanded=False)
+                
+                # Mostra immagine
+                st.image(image, caption="Opera pronta", use_container_width=True)
                 
                 # BOTTONE ANALISI
                 if st.button("✨ Analizza Ora", type="primary"):
                     with st.spinner('Analisi...'):
-                        # Chiamata AI
+                        
                         response = model.generate_content([system_prompt, image])
                         testo = response.text
                         st.session_state['analisi_fatta'] = testo
                         
-                        # Audio
                         clean = testo.replace("*", "").replace("#", "")
                         if clean:
                             tts = gTTS(text=clean, lang='it')
@@ -96,22 +105,21 @@ if img_file is not None:
                             tts.write_to_fp(mp3_fp)
                             st.session_state['audio_fatto'] = mp3_fp
                         
-                        # Ricarica la pagina per mostrare i risultati puliti
                         st.rerun()
                         
             except Exception as e:
-                st.error(f"Errore file: {e}")
+                st.error(f"Errore lettura: {e}")
+                st.warning("Prova a fare uno screenshot della foto e caricare quello.")
                 status.update(label="Errore", state="error")
 
-# --- MOSTRA RISULTATI (SOLO SE C'È ANALISI) ---
 else:
-    # Se img_file è None (cioè l'utente ha cancellato la foto con la X), puliamo tutto
     if st.session_state['analisi_fatta'] is not None:
         reset_dati()
         st.rerun()
 
+# --- RISULTATI ---
 if st.session_state['analisi_fatta']:
-    st.success("Fatto!")
+    st.success("Analisi completata!")
     st.write(st.session_state['analisi_fatta'])
     
     if st.session_state['audio_fatto']:
@@ -119,7 +127,6 @@ if st.session_state['analisi_fatta']:
     
     st.divider()
     
-    # Tasto per forzare la prossima foto
     def prossima_foto():
         st.session_state['uploader_key'] += 1
         reset_dati()
